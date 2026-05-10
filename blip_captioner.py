@@ -99,7 +99,7 @@ class BLIPCaptioner:
     def caption(
         self,
         image_source: str | Path,
-        prompt: str = None,
+        prompt: Optional[str] = None,
         max_new_tokens: int = 100,
         num_beams: int = 5,
     ) -> str:
