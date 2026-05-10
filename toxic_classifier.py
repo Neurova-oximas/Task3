@@ -1,17 +1,22 @@
 """
-toxic_classifier.py  —  CONTRACT FILE
-======================================
-This is the STUB / CONTRACT that defines what the ML team must implement.
-Replace the function bodies with your actual model code.
-Do NOT change:
-  - function signatures
-  - return types
-  - PredictionResult field names or types
+toxic_classifier.py
+--------------------
+ML pipeline contract + implementation stubs.
+
+Two public functions:
+    predict_text_class(text)   -> PredictionResult
+    predict_image_class(image) -> tuple[PredictionResult, str]
+                                  (result, caption) — caption needed for DB logging
+
+Wire your models into the stubs below. Do NOT change function signatures or
+the PredictionResult dataclass — app.py and database.py depend on this contract.
 """
 
 from dataclasses import dataclass
 from typing import Dict
 from PIL import Image
+
+from imagecaption import caption_image
 
 
 # ── Shared data contract ───────────────────────────────────────────────────────
@@ -24,16 +29,17 @@ class PredictionResult:
     Fields
     ------
     label       : str
-        The name of the top predicted class (e.g. "Class A").
+        Name of the top predicted class.
 
     confidence  : float
         Confidence score for the top class. Must be in [0.0, 1.0].
+        Must equal all_scores[label].
 
     all_scores  : Dict[str, float]
-        Confidence score for EVERY class your model outputs.
-        Keys   → class name strings (consistent across calls)
+        Confidence for EVERY class your model outputs.
+        Keys   → class name strings (must be consistent across every call)
         Values → floats in [0.0, 1.0]
-        Should ideally sum to ~1.0 (softmax output), but not enforced.
+        Should sum to ~1.0 (softmax output).
 
     Example
     -------
@@ -41,9 +47,9 @@ class PredictionResult:
         label      = "Severe",
         confidence = 0.87,
         all_scores = {
-            "Clean":   0.05,
-            "Mild":    0.08,
-            "Severe":  0.87,
+            "Clean":  0.05,
+            "Mild":   0.08,
+            "Severe": 0.87,
         }
     )
     """
@@ -62,37 +68,55 @@ def predict_text_class(text: str) -> PredictionResult:
     Parameters
     ----------
     text : str
-        Raw input string from the user. Already stripped of leading/trailing
-        whitespace by the app. Do NOT assume any further preprocessing.
+        Raw input string. Already stripped of whitespace by the caller.
 
     Returns
     -------
     PredictionResult
-        Populated with the top label, its confidence, and all class scores.
     """
-    # ── REPLACE THIS STUB WITH YOUR MODEL CODE ────────────────────────────────
+    # ── INSERT YOUR MODEL CODE HERE ───────────────────────────────────────────
+    #
+    # Example skeleton:
+    #
+    #   inputs = tokenizer(text, return_tensors="pt", truncation=True)
+    #   with torch.no_grad():
+    #       logits = model(**inputs).logits
+    #   probs = torch.softmax(logits, dim=-1).squeeze().tolist()
+    #   class_names = ["Clean", "Mild", "Severe"]   # your actual class names
+    #   all_scores = dict(zip(class_names, probs))
+    #   top_label = max(all_scores, key=all_scores.get)
+    #   return PredictionResult(
+    #       label      = top_label,
+    #       confidence = all_scores[top_label],
+    #       all_scores = all_scores,
+    #   )
+    #
+    #
     return example_prediction
-    #raise NotImplementedError("predict_text_class not implemented yet.")
+    #raise NotImplementedError("predict_text_class: plug in your model here.")
 
 
 # ── Image pipeline ─────────────────────────────────────────────────────────────
 
-def predict_image_class(image: Image.Image) -> PredictionResult:
+def predict_image_class(image: Image.Image) -> tuple[PredictionResult, str]:
     """
     Run the image classification pipeline.
-    (Internally: caption the image → run text classifier, or direct vision model.)
+
+    Internally:
+        1. Caption the image via BLIP-1  (imagecaption.py)
+        2. Pass the caption to predict_text_class()
 
     Parameters
     ----------
     image : PIL.Image.Image
-        RGB image object. Already converted to RGB by the app.
-        Size is NOT guaranteed — handle any resolution inside this function.
+        RGB image. Already converted to RGB by app.py before this is called.
 
     Returns
     -------
-    PredictionResult
-        Populated with the top label, its confidence, and all class scores.
+    tuple[PredictionResult, str]
+        (result, caption) — app.py needs the caption separately to log it to DB.
     """
-    # ── REPLACE THIS STUB WITH YOUR MODEL CODE ────────────────────────────────
-    return example_prediction
-    #raise NotImplementedError("predict_image_class not implemented yet.")
+    return (example_prediction,"this is an example caption")
+    # caption = caption_image(image)
+    # result = predict_text_class(caption)
+    # return result, caption

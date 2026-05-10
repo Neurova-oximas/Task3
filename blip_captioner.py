@@ -88,7 +88,7 @@ class BLIPCaptioner:
         self.model.eval()
 
     def _load_image(self, source: str | Path) -> Image.Image:
-        """Load image from a file path or URL."""
+        """Load image from a file path ."""
         source = str(source)
         if source.startswith("http://") or source.startswith("https://"):
             image = Image.open(requests.get(source, stream=True).raw).convert("RGB")
@@ -98,7 +98,7 @@ class BLIPCaptioner:
 
     def caption(
         self,
-        image_source: str | Path,
+        image_source: Union[str,Path ,Image.Image],
         prompt: Optional[str] = None,
         max_new_tokens: int = 100,
         num_beams: int = 5,
@@ -116,7 +116,11 @@ class BLIPCaptioner:
         Returns:
             Caption string.
         """
-        image = self._load_image(image_source)
+        if isinstance(image_source, Image.Image):
+            image = image_source
+        else:
+            image = self._load_image(image_source)
+
 
         inputs = self.processor(
             images=image,
