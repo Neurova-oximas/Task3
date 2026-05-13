@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantization in Deep Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090f;
+    --surface: #0f0f1a;
+    --surface2: #14142a;
+    --border: rgba(255,255,255,0.07);
+    --accent: #5b8def;
+    --accent2: #a78bfa;
+    --accent3: #34d399;
+    --warn: #f87171;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --faint: #2a2a4a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lora', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.8;
+    overflow-x: hidden;
+  }
+
+  /* ── canvas bg ── */
+  #bg-canvas {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0; pointer-events: none; opacity: 0.4;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 0 2rem; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 6rem 0 4rem;
+    position: relative;
+  }
+
+  .hero-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 2rem;
+    opacity: 0; animation: fadeUp 0.6s 0.2s forwards;
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    font-weight: 800; line-height: 1.05;
+    letter-spacing: -0.03em;
+    color: #fff;
+    opacity: 0; animation: fadeUp 0.7s 0.35s forwards;
+  }
+
+  .hero h1 .accent-word {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    margin-top: 1.5rem;
+    font-size: 1.05rem; color: var(--muted); max-width: 520px;
+    opacity: 0; animation: fadeUp 0.7s 0.5s forwards;
+  }
+
+  .hero-meta {
+    margin-top: 2.5rem;
+    display: flex; gap: 2rem; align-items: center;
+    opacity: 0; animation: fadeUp 0.7s 0.65s forwards;
+  }
+
+  .hero-meta span {
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted);
+  }
+
+  .hero-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--faint); }
+
+  .scroll-hint {
+    position: absolute; bottom: 2.5rem; left: 0;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 0.15em;
+    display: flex; align-items: center; gap: 0.75rem;
+    opacity: 0; animation: fadeUp 0.7s 1s forwards;
+  }
+
+  .scroll-hint::before {
+    content: ''; display: block; width: 24px; height: 1px; background: var(--muted);
+  }
+
+  /* ── SECTION ── */
+  .section {
+    padding: 5rem 0;
+    border-top: 1px solid var(--border);
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  .section.visible { opacity: 1; transform: translateY(0); }
+
+  .section-num {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--accent); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 0.75rem;
+  }
+
+  .section h2 {
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    color: #fff; line-height: 1.2; margin-bottom: 1.8rem;
+    letter-spacing: -0.02em;
+  }
+
+  .section p { color: var(--text); margin-bottom: 1.2rem; }
+
+  .section h3 {
+    font-family: 'Syne', sans-serif; font-weight: 600;
+    font-size: 1.1rem; color: var(--accent2);
+    margin: 2rem 0 0.75rem; letter-spacing: -0.01em;
+  }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 2px solid var(--accent);
+    background: rgba(91,141,239,0.05);
+    padding: 1.2rem 1.5rem; border-radius: 0 8px 8px 0;
+    margin: 1.5rem 0; color: var(--text); font-style: italic;
+  }
+
+  /* ── FORMULA ── */
+  .formula-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem 2rem;
+    margin: 1.5rem 0; font-family: 'DM Mono', monospace;
+    font-size: 1rem; color: var(--accent3);
+    display: flex; align-items: center; gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .formula-block .formula-label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.15em;
+    display: block; margin-bottom: 0.5rem;
+  }
+
+  .formula-vars {
+    margin-top: 1rem; display: grid; gap: 0.5rem;
+    grid-template-columns: auto 1fr;
+  }
+
+  .formula-vars dt {
+    font-family: 'DM Mono', monospace; color: var(--accent3); font-size: 0.9rem;
+    padding-right: 1rem;
+  }
+
+  .formula-vars dd { color: var(--muted); font-size: 0.9rem; font-family: 'Lora', serif; }
+
+  /* ── QUANTIZATION VISUALIZER ── */
+  .viz-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px; padding: 2rem;
+    margin: 2rem 0;
+  }
+
+  .viz-title {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.15em; margin-bottom: 1.5rem;
+  }
+
+  .precision-bars { display: flex; flex-direction: column; gap: 1.2rem; }
+
+  .precision-row { display: flex; align-items: center; gap: 1rem; }
+
+  .precision-label {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--muted); width: 48px; text-align: right; flex-shrink: 0;
+  }
+
+  .precision-track {
+    flex: 1; height: 10px; background: var(--faint);
+    border-radius: 5px; overflow: hidden; position: relative;
+  }
+
+  .precision-fill {
+    height: 100%; border-radius: 5px;
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .precision-track.animate .precision-fill { transform: scaleX(1); }
+
+  .precision-stat {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); width: 80px; flex-shrink: 0;
+  }
+
+  /* ── TENSOR DEMO ── */
+  .tensor-demo {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem; margin: 1.5rem 0;
+    font-family: 'DM Mono', monospace; font-size: 13px;
+  }
+
+  .tensor-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.8rem; align-items: center; }
+  .tensor-label { color: var(--muted); font-size: 11px; width: 100%; margin-bottom: 0.3rem; }
+
+  .tensor-val {
+    background: var(--faint); color: var(--text);
+    padding: 4px 10px; border-radius: 5px; font-size: 12px;
+    transition: all 0.4s ease;
+  }
+
+  .tensor-val.highlighted {
+    background: rgba(91,141,239,0.2);
+    color: var(--accent); border: 1px solid rgba(91,141,239,0.3);
+  }
+
+  .tensor-arrow { color: var(--accent3); font-size: 1.2rem; margin: 0.5rem 0; }
+
+  /* ── GATE DIAGRAM ── */
+  .gate-diagram {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 2rem; margin: 2rem 0;
+    overflow: hidden;
+  }
+
+  .gates-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0; }
+
+  .gate-pill {
+    padding: 0.6rem 1.4rem; border-radius: 100px;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    border: 1px solid; cursor: pointer;
+    transition: all 0.3s ease; position: relative; overflow: hidden;
+  }
+
+  .gate-pill.forget { border-color: var(--warn); color: var(--warn); background: rgba(248,113,113,0.05); }
+  .gate-pill.input  { border-color: var(--accent); color: var(--accent); background: rgba(91,141,239,0.05); }
+  .gate-pill.output { border-color: var(--accent3); color: var(--accent3); background: rgba(52,211,153,0.05); }
+
+  .gate-pill:hover { transform: translateY(-2px); }
+  .gate-pill.forget:hover  { background: rgba(248,113,113,0.15); box-shadow: 0 4px 20px rgba(248,113,113,0.2); }
+  .gate-pill.input:hover   { background: rgba(91,141,239,0.15);  box-shadow: 0 4px 20px rgba(91,141,239,0.2); }
+  .gate-pill.output:hover  { background: rgba(52,211,153,0.15);  box-shadow: 0 4px 20px rgba(52,211,153,0.2); }
+
+  .sigmoid-demo {
+    display: flex; align-items: center; justify-content: center;
+    gap: 2rem; flex-wrap: wrap; margin: 1.5rem 0;
+  }
+
+  .sig-value {
+    text-align: center; padding: 1rem 1.5rem;
+    background: var(--surface2); border-radius: 10px;
+    border: 1px solid var(--border);
+    transition: all 0.4s ease;
+  }
+
+  .sig-value .val {
+    font-family: 'DM Mono', monospace; font-size: 1.8rem; font-weight: 300;
+    display: block; margin-bottom: 0.3rem;
+  }
+
+  .sig-value .verdict {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+  }
+
+  .sig-value.keep .val { color: var(--accent3); }
+  .sig-value.keep .verdict { color: var(--accent3); }
+  .sig-value.forget-v .val { color: var(--warn); }
+  .sig-value.forget-v .verdict { color: var(--warn); }
+
+  .sig-arrow { font-size: 1.5rem; color: var(--muted); }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table {
+    width: 100%; border-collapse: collapse; margin: 1.5rem 0;
+    font-size: 0.9rem;
+  }
+
+  .compare-table th {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--muted); padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border); text-align: left;
+  }
+
+  .compare-table td {
+    padding: 0.9rem 1rem; border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .compare-table td:first-child {
+    font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted);
+  }
+
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 100px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  .badge-green { background: rgba(52,211,153,0.1); color: var(--accent3); border: 1px solid rgba(52,211,153,0.2); }
+  .badge-red   { background: rgba(248,113,113,0.1); color: var(--warn);    border: 1px solid rgba(248,113,113,0.2); }
+  .badge-blue  { background: rgba(91,141,239,0.1);  color: var(--accent);  border: 1px solid rgba(91,141,239,0.2); }
+
+  /* ── ERROR ACCUMULATION CHART ── */
+  #error-canvas { width: 100%; height: 180px; display: block; border-radius: 8px; }
+
+  /* ── CONCLUSION ── */
+  .conclusion {
+    padding: 5rem 0 8rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .conclusion-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem; margin: 2rem 0;
+  }
+
+  .conclusion-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .conclusion-card.visible { opacity: 1; transform: translateY(0); }
+
+  .conclusion-card .card-icon {
+    font-size: 1.5rem; margin-bottom: 0.75rem; display: block;
+  }
+
+  .conclusion-card h4 {
+    font-family: 'Syne', sans-serif; font-size: 0.95rem;
+    font-weight: 600; color: #fff; margin-bottom: 0.5rem;
+  }
+
+  .conclusion-card p {
+    font-size: 0.82rem; color: var(--muted); line-height: 1.6; margin: 0;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding: 2rem 0; border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); display: flex;
+    justify-content: space-between; align-items: center;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  /* ── NAV ── */
+  .side-nav {
+    position: fixed; right: 2rem; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 0.6rem; z-index: 100;
+  }
+
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--faint); cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .nav-dot.active { background: var(--accent); transform: scale(1.5); }
+  .nav-dot:hover  { background: var(--muted); }
+
+  @media (max-width: 700px) {
+    .side-nav { display: none; }
+    .conclusion-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<nav class="side-nav" id="side-nav"></nav>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero" id="s0">
+    <p class="hero-tag">// Technical Report · Deep Learning</p>
+    <h1>
+      Quantization<br>
+      in <span class="accent-word">Deep Learning</span>
+    </h1>
+    <p class="hero-sub">
+      How we trade a little precision for a lot of efficiency — and why that's harder than it sounds.
+    </p>
+    <div class="hero-meta">
+      <span>Omar</span>
+      <div class="dot"></div>
+      <span>Communications &amp; Electronics Engineering</span>
+      <div class="dot"></div>
+      <span>2025</span>
+    </div>
+    <p class="scroll-hint">scroll to read</p>
+  </section>
+
+  <!-- SECTION 1: WHAT IS -->
+  <section class="section" id="s1">
+    <p class="section-num">01 — Definition</p>
+    <h2>What is Quantization?</h2>
+    <p>
+      Deep learning models are powerful, but heavy. They are slow, memory-hungry, and expensive to run — especially on edge devices.
+      Quantization is the technique used to make them leaner without throwing away what makes them good.
+    </p>
+    <p>
+      Specifically, quantization is the process of reducing the numerical precision of a model's parameters — its weights and activation values —
+      by mapping them from a high-precision data type to a lower-precision one.
+    </p>
+
+    <div class="viz-container">
+      <p class="viz-title">// Precision vs. memory footprint</p>
+      <div class="precision-bars" id="precision-bars">
+        <div class="precision-row">
+          <span class="precision-label">FP32</span>
+          <div class="precision-track" style="--delay:0.1s">
+            <div class="precision-fill" style="background:linear-gradient(90deg,#5b8def,#a78bfa);width:100%"></div>
+          </div>
+          <span class="precision-stat">32 bits · 4 B</span>
+        </div>
+        <div class="precision-row">
+          <span class="precision-label">FP16</span>
+          <div class="precision-track" style="--delay:0.3s">
+            <div class="precision-fill" style="background:linear-gradient(90deg,#5b8def,#a78bfa);width:50%"></div>
+          </div>
+          <span class="precision-stat">16 bits · 2 B</span>
+        </div>
+        <div class="precision-row">
+          <span class="precision-label">INT8</span>
+          <div class="precision-track" style="--delay:0.5s">
+            <div class="precision-fill" style="background:linear-gradient(90deg,#34d399,#5b8def);width:25%"></div>
+          </div>
+          <span class="precision-stat">8 bits · 1 B</span>
+        </div>
+        <div class="precision-row">
+          <span class="precision-label">INT4</span>
+          <div class="precision-track" style="--delay:0.7s">
+            <div class="precision-fill" style="background:linear-gradient(90deg,#34d399,#5b8def);width:12.5%"></div>
+          </div>
+          <span class="precision-stat">4 bits · 0.5 B</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      During inference, models do not require the full precision of FP32. A weight of 0.00431287 versus 0.0043
+      makes no meaningful difference to the prediction — but it doubles the memory cost.
+    </div>
+  </section>
+
+  <!-- SECTION 2: HOW -->
+  <section class="section" id="s2">
+    <p class="section-num">02 — Mechanics</p>
+    <h2>How Does It Work?</h2>
+    <p>
+      The naive approach — just casting weights to <code style="font-family:'DM Mono',monospace;color:var(--accent3);font-size:0.9em">int(weight)</code> — would destroy the model.
+      The real process maps the <em>range</em> of floating-point values to the range of the target type using a scale factor,
+      preserving relative relationships between values.
+    </p>
+
+    <h3>Absolute Max Quantization</h3>
+    <p>
+      Take every value in the tensor, divide by the maximum absolute value, then multiply by the target range's max.
+      Simple, and assumes the data is symmetric around zero.
+    </p>
+
+    <div class="tensor-demo" id="tensor-demo">
+      <div class="tensor-row">
+        <span class="tensor-label">// input tensor (FP32)</span>
+      </div>
+      <div class="tensor-row" id="t-input">
+        <span class="tensor-val">1.0</span><span class="tensor-val">2.0</span><span class="tensor-val">3.0</span>
+        <span class="tensor-val">4.0</span><span class="tensor-val">5.0</span><span class="tensor-val">6.0</span>
+        <span class="tensor-val">7.0</span><span class="tensor-val">8.0</span><span class="tensor-val highlighted">9.0</span>
+        <span class="tensor-val highlighted">10.0</span>
+      </div>
+      <div class="tensor-row"><span style="color:var(--muted);font-size:12px">max = 10.0 → scale = 100/10 = 10.0</span></div>
+      <div class="tensor-arrow">↓ × 10 → round</div>
+      <div class="tensor-row">
+        <span class="tensor-label">// quantized (INT, range [-100,100])</span>
+      </div>
+      <div class="tensor-row" id="t-output">
+        <span class="tensor-val" style="color:var(--accent3)">10</span>
+        <span class="tensor-val" style="color:var(--accent3)">20</span>
+        <span class="tensor-val" style="color:var(--accent3)">30</span>
+        <span class="tensor-val" style="color:var(--accent3)">40</span>
+        <span class="tensor-val" style="color:var(--accent3)">50</span>
+        <span class="tensor-val" style="color:var(--accent3)">60</span>
+        <span class="tensor-val" style="color:var(--accent3)">70</span>
+        <span class="tensor-val" style="color:var(--accent3)">80</span>
+        <span class="tensor-val" style="color:var(--accent3)">90</span>
+        <span class="tensor-val" style="color:var(--accent3)">100</span>
+      </div>
+    </div>
+
+    <h3>Affine Quantization</h3>
+    <p>
+      Affine quantization handles asymmetric distributions — like ReLU activations that are always positive.
+      It is essentially an affine linear transformation in reverse: divide by the slope, add the intercept, then round.
+    </p>
+
+    <div class="formula-block">
+      <div style="width:100%">
+        <span class="formula-label">// affine quantization formula</span>
+        <span style="font-size:1.2rem">x<sub>q</sub> = round( (1/S) · x + Z )</span>
+      </div>
+      <dl class="formula-vars" style="width:100%">
+        <dt>x<sub>q</sub></dt><dd>quantized integer output</dd>
+        <dt>S</dt><dd>floating-point scale factor (the "slope")</dd>
+        <dt>Z</dt><dd>zero point — integer corresponding to FP zero. For [-128,128]: Z=0. For [0,255]: Z=128.</dd>
+        <dt>round</dt><dd>snap to nearest integer</dd>
+      </dl>
+    </div>
+
+    <p>
+      One practical concern: <strong style="color:#fff;font-weight:600">outliers</strong>. If one value is 50.0 in a tensor of [0.1, 0.2, 0.3...],
+      the entire scaling range stretches to accommodate it, squishing all normal values together and destroying their precision.
+      The fix is <em>block quantization</em> — split the tensor into groups of 64–128 and quantize each block independently.
+    </p>
+  </section>
+
+  <!-- SECTION 3: TYPES -->
+  <section class="section" id="s3">
+    <p class="section-num">03 — Techniques</p>
+    <h2>Types of Quantization</h2>
+    <p>
+      Two main approaches differ in <em>when</em> quantization is applied relative to training.
+    </p>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Post-Training (PTQ)</th>
+          <th>Quantization-Aware (QAT)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>When applied</td>
+          <td>After training</td>
+          <td>During training</td>
+        </tr>
+        <tr>
+          <td>Compute cost</td>
+          <td><span class="badge badge-green">Low</span></td>
+          <td><span class="badge badge-red">High</span></td>
+        </tr>
+        <tr>
+          <td>Accuracy</td>
+          <td><span class="badge badge-blue">Moderate</span></td>
+          <td><span class="badge badge-green">Higher</span></td>
+        </tr>
+        <tr>
+          <td>Data needed</td>
+          <td><span class="badge badge-green">Minimal</span></td>
+          <td><span class="badge badge-red">Large dataset</span></td>
+        </tr>
+        <tr>
+          <td>Best for</td>
+          <td>Budget-constrained inference</td>
+          <td>Accuracy-critical fine-tuning</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      <strong style="color:#fff;font-weight:600">PTQ</strong> takes an already-trained model and quantizes it after the fact.
+      Fast and cheap — the model never saw quantization noise during training, so accuracy can drop.
+    </p>
+    <p>
+      <strong style="color:#fff;font-weight:600">QAT</strong> simulates quantization noise <em>during</em> training itself,
+      so the model learns to be robust to precision loss. More accurate, but orders of magnitude more expensive.
+    </p>
+  </section>
+
+  <!-- SECTION 4: RISKS -->
+  <section class="section" id="s4">
+    <p class="section-num">04 — Risks</p>
+    <h2>Risks &amp; Limitations</h2>
+    <p>
+      Quantization is not free. There are three main risks, with the LSTM-specific one being the most subtle and dangerous.
+    </p>
+
+    <h3>Accuracy Loss &amp; Error Accumulation</h3>
+    <p>
+      Every quantized value carries a small rounding error. In shallow models this stays contained,
+      but in deep networks with many layers, these errors compound across the forward pass.
+      The larger the model, the more opportunities for small errors to accumulate into something significant.
+    </p>
+
+    <h3>The LSTM Problem</h3>
+    <p>
+      LSTMs are particularly vulnerable to quantization for two compounding reasons.
+    </p>
+
+    <div class="gate-diagram">
+      <p class="viz-title">// LSTM gate sensitivity — hover each gate</p>
+      <div class="gates-row">
+        <div class="gate-pill forget" onmouseenter="showGate('forget')" onmouseleave="showGate(null)">forget gate</div>
+        <div class="gate-pill input"  onmouseenter="showGate('input')"  onmouseleave="showGate(null)">input gate</div>
+        <div class="gate-pill output" onmouseenter="showGate('output')" onmouseleave="showGate(null)">output gate</div>
+      </div>
+      <p id="gate-desc" style="font-size:0.85rem;color:var(--muted);text-align:center;min-height:2.5rem;transition:all 0.3s">
+        All gates use sigmoid → output range [0, 1]. Hover to explore.
+      </p>
+
+      <div class="sigmoid-demo">
+        <div class="sig-value keep">
+          <span class="val">0.51</span>
+          <span class="verdict" style="color:var(--accent3)">✓ keep</span>
+        </div>
+        <div class="sig-arrow">
+          <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center">
+            quantize<br>↓<br>rounding error
+          </div>
+        </div>
+        <div class="sig-value forget-v">
+          <span class="val">0.49</span>
+          <span class="verdict">✗ forget</span>
+        </div>
+      </div>
+
+      <p style="font-size:0.85rem;color:var(--muted);text-align:center">
+        A 0.02 difference flips the gate decision entirely. Normal NNs only apply sigmoid at the final output layer — LSTMs apply it at every time step.
+      </p>
+    </div>
+
+    <h3>Recurrent Error Accumulation</h3>
+    <p>
+      The second problem is the recurrence. In a normal neural network, one rounding error stays at that layer —
+      it doesn't travel anywhere. In an LSTM, the hidden state carries forward from step to step.
+      A gate error at time step 5 flows into step 6, then step 7, then step 8 — it accumulates across the entire sequence.
+    </p>
+    <p>
+      This is exactly analogous to slope overload error in delta quantization from digital communications:
+      when the signal changes too fast for the step size, the quantizer can't keep up and the error keeps building.
+      In LSTMs, the recurrence is the mechanism that turns a small rounding error into a serious accuracy problem.
+    </p>
+
+    <div class="viz-container">
+      <p class="viz-title">// error accumulation over time steps (simulated)</p>
+      <canvas id="error-canvas"></canvas>
+    </div>
+  </section>
+
+  <!-- CONCLUSION -->
+  <section class="conclusion" id="s5">
+    <p class="section-num">05 — Takeaway</p>
+    <h2>Conclusion</h2>
+    <p>
+      Quantization is one of the most practical tools in the ML engineer's belt.
+      Done right, it makes models faster, smaller, and deployable on hardware that would otherwise choke.
+      Done wrong — or applied to the wrong architecture — it quietly breaks things in ways that are hard to debug.
+    </p>
+
+    <div class="conclusion-grid">
+      <div class="conclusion-card" id="cc1">
+        <span class="card-icon">⚖️</span>
+        <h4>Absmax vs. Affine</h4>
+        <p>Use absmax for symmetric data. Use affine when distributions are asymmetric — like post-ReLU activations.</p>
+      </div>
+      <div class="conclusion-card" id="cc2" style="transition-delay:0.1s">
+        <span class="card-icon">💰</span>
+        <h4>PTQ vs. QAT</h4>
+        <p>Budget-constrained? Use PTQ. Need maximum accuracy and have compute? Use QAT. There is no free lunch.</p>
+      </div>
+      <div class="conclusion-card" id="cc3" style="transition-delay:0.2s">
+        <span class="card-icon">⚠️</span>
+        <h4>LSTM caution</h4>
+        <p>Gate sensitivity plus recurrent accumulation makes LSTMs the hardest architecture to quantize. Handle with extra care.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Quantization in Deep Learning</span>
+    <span>Omar · 2025</span>
+  </footer>
+
+</div>
+
+<script>
+// ── Background canvas ──────────────────────────────────────────────────────
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+let W2, H2, particles = [];
+
+function resizeBg() {
+  W2 = bgCanvas.width = window.innerWidth;
+  H2 = bgCanvas.height = window.innerHeight;
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < 60; i++) {
+    particles.push({
+      x: Math.random() * W2, y: Math.random() * H2,
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.5,
+      a: Math.random() * 0.4 + 0.1
+    });
+  }
+}
+
+function drawBg() {
+  bgCtx.clearRect(0, 0, W2, H2);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = W2; if (p.x > W2) p.x = 0;
+    if (p.y < 0) p.y = H2; if (p.y > H2) p.y = 0;
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bgCtx.fillStyle = `rgba(91,141,239,${p.a})`;
+    bgCtx.fill();
+  });
+  // connections
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < 120) {
+        bgCtx.beginPath();
+        bgCtx.moveTo(particles[i].x, particles[i].y);
+        bgCtx.lineTo(particles[j].x, particles[j].y);
+        bgCtx.strokeStyle = `rgba(91,141,239,${0.08 * (1 - d/120)})`;
+        bgCtx.lineWidth = 0.5;
+        bgCtx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(drawBg);
+}
+
+resizeBg(); initParticles(); drawBg();
+window.addEventListener('resize', () => { resizeBg(); initParticles(); });
+
+// ── Side nav ──────────────────────────────────────────────────────────────
+const sections = ['s0','s1','s2','s3','s4','s5'];
+const nav = document.getElementById('side-nav');
+sections.forEach((id, i) => {
+  const dot = document.createElement('div');
+  dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+  dot.onclick = () => document.getElementById(id).scrollIntoView({behavior:'smooth'});
+  nav.appendChild(dot);
+});
+
+const navDots = nav.querySelectorAll('.nav-dot');
+
+// ── Intersection observer ──────────────────────────────────────────────────
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      const idx = sections.indexOf(entry.target.id);
+      if (idx !== -1) {
+        navDots.forEach((d,i) => d.classList.toggle('active', i === idx));
+      }
+      // animate precision bars
+      if (entry.target.id === 's1') {
+        setTimeout(() => {
+          document.querySelectorAll('.precision-track').forEach((t,i) => {
+            setTimeout(() => t.classList.add('animate'), i * 150);
+          });
+        }, 200);
+      }
+      // animate conclusion cards
+      if (entry.target.id === 's5') {
+        ['cc1','cc2','cc3'].forEach((id,i) => {
+          setTimeout(() => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('visible');
+          }, i * 100);
+        });
+      }
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.section, .conclusion').forEach(s => observer.observe(s));
+
+// ── Gate descriptions ──────────────────────────────────────────────────────
+const gateDesc = {
+  forget: 'Forget gate: decides what to erase from cell memory. Sigmoid output near 0 = forget, near 1 = keep. Quantization can flip this.',
+  input:  'Input gate: decides what new information to write into memory. A rounding error here corrupts what the cell learns at this step.',
+  output: 'Output gate: decides what part of the cell state to expose. Errors here affect every downstream computation in the sequence.'
+};
+
+function showGate(type) {
+  document.getElementById('gate-desc').textContent =
+    type ? gateDesc[type] : 'All gates use sigmoid → output range [0, 1]. Hover to explore.';
+}
+
+// ── Error accumulation chart ───────────────────────────────────────────────
+function drawErrorChart() {
+  const canvas = document.getElementById('error-canvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 180 * dpr;
+  ctx.scale(dpr, dpr);
+  const cw = rect.width, ch = 180;
+
+  const steps = 20;
+  const padL = 40, padR = 20, padT = 20, padB = 30;
+  const plotW = cw - padL - padR;
+  const plotH = ch - padT - padB;
+
+  // Generate data
+  let normalErr = [], lstmErr = [];
+  let nAcc = 0, lAcc = 0;
+  for (let i = 0; i < steps; i++) {
+    nAcc += Math.random() * 0.8;
+    lAcc += Math.random() * 0.8 + i * 0.15;
+    normalErr.push(Math.min(nAcc, 10));
+    lstmErr.push(Math.min(lAcc, 10));
+  }
+
+  const maxVal = Math.max(...lstmErr);
+
+  function toX(i) { return padL + (i / (steps-1)) * plotW; }
+  function toY(v) { return padT + plotH - (v / maxVal) * plotH; }
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (i/4) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL+plotW, y); ctx.stroke();
+  }
+
+  // Normal NN line
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(normalErr[0]));
+  normalErr.forEach((v,i) => i > 0 && ctx.lineTo(toX(i), toY(v)));
+  ctx.strokeStyle = 'rgba(91,141,239,0.6)'; ctx.lineWidth = 2;
+  ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // LSTM line
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(lstmErr[0]));
+  lstmErr.forEach((v,i) => i > 0 && ctx.lineTo(toX(i), toY(v)));
+  ctx.strokeStyle = '#f87171'; ctx.lineWidth = 2.5; ctx.stroke();
+
+  // Labels
+  ctx.font = '11px DM Mono, monospace';
+  ctx.fillStyle = 'rgba(91,141,239,0.8)';
+  ctx.fillText('Normal NN', padL + 4, padT + 14);
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('LSTM', padL + 4, padT + 28);
+
+  // X axis label
+  ctx.fillStyle = 'rgba(112,112,160,0.7)';
+  ctx.fillText('time steps →', padL, ch - 6);
+}
+
+// Run after layout
+setTimeout(drawErrorChart, 500);
+window.addEventListener('resize', drawErrorChart);
+</script>
+</body>
+</html>
